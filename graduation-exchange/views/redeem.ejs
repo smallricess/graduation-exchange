@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>核销纪念徽章</title>
+    <style>
+        body{background:#f0f2f5;padding:20px;font-family:sans-serif;}
+        .card{max-width:500px;margin:0 auto;background:white;border-radius:28px;padding:24px;}
+        .info{background:#eef2ff;padding:16px;border-radius:20px;margin-bottom:20px;}
+        .btn{width:100%;padding:14px;background:#10b981;color:white;border:none;border-radius:50px;font-size:16px;font-weight:bold;cursor:pointer;}
+        .btn:active{background:#059669;}
+        .status{text-align:center;padding:20px;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <% if (isRedeemed) { %>
+        <div class="status" style="background:#d1fae5;border-radius:20px;">
+            <h2>✅ 已核销</h2>
+            <p>该码已于 <%= new Date(submission.redeemed_at).toLocaleString() %> 兑换</p>
+            <a href="/" style="color:#3b82f6;">返回首页</a>
+        </div>
+    <% } else { %>
+        <h2>🎫 核销确认</h2>
+        <div class="info">
+            <p><strong>姓名：</strong> <%= submission.fullname %></p>
+            <p><strong>学号：</strong> <%= submission.studentId %></p>
+            <p><strong>手机号：</strong> <%= submission.phone %></p>
+            <% if(submission.photoPath) { %>
+                <p><strong>照片：</strong> <a href="<%= submission.photoPath %>" target="_blank">点击查看</a></p>
+            <% } %>
+            <p><strong>核销码：</strong> <%= submission.code %></p>
+        </div>
+        <button id="redeemBtn" class="btn">✅ 确认核销 · 兑换徽章</button>
+        <p style="margin-top:12px;font-size:0.75rem;color:#666;">核销后不可撤销，请核对身份</p>
+    <% } %>
+</div>
+<script>
+    document.getElementById('redeemBtn')?.addEventListener('click', async function() {
+        const res = await fetch('/api/redeem', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code: '<%= code %>' })
+        });
+        const data = await res.json();
+        alert(data.message);
+        if(data.success) location.reload();
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成功 - 您的核销码</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
+    <style>
+        body{background:#f0f2f5;padding:20px;font-family:sans-serif;}
+        .card{max-width:500px;margin:0 auto;background:white;border-radius:28px;padding:24px;text-align:center;}
+        .code{background:#f1f5f9;font-family:monospace;font-size:20px;padding:8px 16px;border-radius:50px;letter-spacing:1px;}
+        .qrcode{display:flex;justify-content:center;margin:20px 0;}
+        .btn{display:inline-block;background:#3b82f6;color:white;padding:8px 20px;border-radius:40px;text-decoration:none;margin-top:10px;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>🎉 提交成功！</h2>
+    <p>您的专属核销码：</p>
+    <div class="code"><%= code %></div>
+    <div class="qrcode" id="qrcode"></div>
+    <p>活动当天，工作人员扫描二维码即可为您兑换纪念徽章</p>
+    <a href="/" class="btn">返回首页</a>
+</div>
+<script>
+    const url = '<%= verifyUrl %>';
+    new QRCode(document.getElementById("qrcode"), {
+        text: url,
+        width: 180,
+        height: 180,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+    });
+</script>
+</body>
+</html>

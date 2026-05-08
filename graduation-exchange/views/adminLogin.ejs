@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员登录</title>
+    <style>
+        body{background:#f0f2f5;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+        .card{background:white;border-radius:28px;padding:32px;width:320px;}
+        input{width:100%;padding:12px;margin:10px 0;border-radius:40px;border:1px solid #ccc;}
+        button{width:100%;padding:12px;background:#3b82f6;border:none;border-radius:40px;color:white;font-weight:bold;}
+        .error{color:red;text-align:center;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>管理员登录</h2>
+    <% if(locals.error && error) { %>
+        <div class="error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/admin/login">
+        <input type="password" name="password" placeholder="密码" required>
+        <button type="submit">登录后台</button>
+    </form>
+</div>
+</body>
+</html>
