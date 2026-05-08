@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理面板</title>
+    <style>
+        body{background:#f0f2f5;padding:16px;font-family:sans-serif;}
+        .card{background:white;border-radius:28px;padding:20px;overflow-x:auto;}
+        table{width:100%;border-collapse:collapse;}
+        th,td{padding:10px;text-align:left;border-bottom:1px solid #e2e8f0;}
+        th{background:#f8fafc;}
+        .thumb{width:40px;height:40px;object-fit:cover;border-radius:12px;}
+        .status{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;}
+        .used{background:#d1fae5;color:#065f46;}
+        .unused{background:#fed7aa;color:#9a3412;}
+        .logout{float:right;background:#ef4444;padding:5px 12px;border-radius:40px;color:white;text-decoration:none;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>📋 所有兑换申请记录 <a href="/admin/logout" class="logout">登出</a></h2>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead><tr><th>ID</th><th>姓名</th><th>学号</th><th>手机</th><th>照片</th><th>核销码</th><th>状态</th><th>提交时间</th><th>核销时间</th></tr></thead>
+            <tbody>
+                <% submissions.forEach(s => { %>
+                <tr>
+                    <td><%= s.id %></td>
+                    <td><%= s.fullname %></td>
+                    <td><%= s.studentId %></td>
+                    <td><%= s.phone %></td>
+                    <td><% if(s.photoPath) { %><a href="<%= s.photoPath %>" target="_blank"><img src="<%= s.photoPath %>" class="thumb"></a><% } else { %>无<% } %></td>
+                    <td style="font-family:monospace;"><%= s.code %></td>
+                    <td><span class="status <%= s.status === 'redeemed' ? 'used' : 'unused' %>"><%= s.status === 'redeemed' ? '已核销' : '未核销' %></span></td>
+                    <td><%= new Date(s.created_at).toLocaleString() %></td>
+                    <td><%= s.redeemed_at ? new Date(s.redeemed_at).toLocaleString() : '—' %></td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <p style="margin-top:20px;">总提交人数: <%= submissions.length %></p>
+</div>
+</body>
+</html>

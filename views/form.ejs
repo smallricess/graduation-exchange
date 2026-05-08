@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>毕业季 · 纪念徽章申请</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, -apple-system, 'Segoe UI', Roboto;}
+        body{background:#f0f2f5;padding:20px;}
+        .container{max-width:600px;margin:0 auto;}
+        .card{background:white;border-radius:28px;padding:24px;box-shadow:0 10px 25px rgba(0,0,0,0.05);}
+        h2{margin-bottom:20px;color:#1e293b;border-left:5px solid #3b82f6;padding-left:15px;}
+        .form-group{margin-bottom:20px;}
+        label{font-weight:500;display:block;margin-bottom:6px;color:#334155;}
+        input, .upload-area{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:18px;font-size:16px;}
+        input:focus{border-color:#3b82f6;outline:none;box-shadow:0 0 0 2px rgba(59,130,246,0.2);}
+        .upload-area{background:#f8fafc;text-align:center;cursor:pointer;border:dashed 2px #cbd5e1;}
+        .btn{width:100%;padding:14px;background:#3b82f6;color:white;border:none;border-radius:40px;font-size:16px;font-weight:600;cursor:pointer;}
+        .btn:hover{background:#2563eb;}
+        .error{background:#fee2e2;padding:12px;border-radius:20px;margin-bottom:20px;color:#b91c1c;}
+        .photo-preview{margin-top:10px;max-width:120px;border-radius:16px;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="card">
+        <h2>🎓 毕业季纪念徽章兑换</h2>
+        <p style="margin-bottom:20px;color:#475569;">填写真实信息，提交后生成核销二维码，活动当天凭码领取徽章</p>
+        <% if (locals.error && error) { %>
+            <div class="error"><%= error %></div>
+        <% } %>
+        <form action="/submit-form" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>姓名 *</label>
+                <input type="text" name="fullname" placeholder="张三" required>
+            </div>
+            <div class="form-group">
+                <label>学号/工号 *</label>
+                <input type="text" name="studentId" placeholder="2024xxxx" required>
+            </div>
+            <div class="form-group">
+                <label>手机号码 *</label>
+                <input type="tel" name="phone" placeholder="用于现场核销确认" required>
+            </div>
+            <div class="form-group">
+                <label>邮箱 (选填)</label>
+                <input type="email" name="email" placeholder="接收电子凭证">
+            </div>
+            <div class="form-group">
+                <label>上传照片 (证件照/生活照)</label>
+                <div class="upload-area" onclick="document.getElementById('photoFile').click()">📷 点击上传图片 (jpg/png)</div>
+                <input type="file" id="photoFile" name="photo" accept="image/*" style="display:none">
+                <div class="photo-preview" id="preview"></div>
+            </div>
+            <button type="submit" class="btn">提交信息 · 获取核销码</button>
+        </form>
+    </div>
+</div>
+<script>
+    document.getElementById('photoFile').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if(file) {
+            let reader = new FileReader();
+            reader.onload = function(ev) {
+                let img = document.createElement('img');
+                img.src = ev.target.result;
+                img.style.maxWidth = '100%';
+                img.style.borderRadius = '12px';
+                let preview = document.getElementById('preview');
+                preview.innerHTML = '';
+                preview.appendChild(img);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+</body>
+</html>
