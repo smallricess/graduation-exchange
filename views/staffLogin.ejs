@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工作人员核销登录</title>
+    <style>
+        body{background:#f0f2f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;}
+        .card{background:white;border-radius:28px;padding:32px;width:320px;text-align:center;}
+        input{width:100%;padding:12px;margin:10px 0;border-radius:40px;border:1px solid #ccc;}
+        button{width:100%;padding:12px;background:#10b981;border:none;border-radius:40px;color:white;font-weight:bold;cursor:pointer;}
+        .error{color:red;}
+        h2{color:#1e293b;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>🔐 工作人员核销入口</h2>
+    <% if(locals.error && error) { %>
+        <div class="error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/staff/login">
+        <input type="password" name="password" placeholder="核销密码" required>
+        <input type="hidden" name="redirect" value="<%= redirect %>">
+        <button type="submit">登录并继续核销</button>
+    </form>
+    <p style="margin-top:16px;font-size:0.75rem;">联系管理员获取密码</p>
+</div>
+</body>
+</html>

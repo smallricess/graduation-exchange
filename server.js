@@ -9,10 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 使用环境变量中的公网地址（Railway 自动提供），或本地开发默认
 app.set('trust proxy', 1);
-
-// 配置静态文件目录
 app.use(express.static('public'));
 app.use('/uploads', express.static('uploads'));
 
@@ -22,19 +19,16 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.json({ limit: '10mb' }));
 
-// Session 配置（用于管理员登录）
 app.use(session({
     secret: process.env.SESSION_SECRET || 'graduation_secret_2026',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 } // 一天
+    cookie: { secure: false, maxAge: 1000 * 60 * 60 * 24 }
 }));
 
-// 确保 uploads 文件夹存在
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// Multer 配置
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => {
@@ -54,7 +48,6 @@ const upload = multer({
     }
 });
 
-// 初始化数据库
 const db = new sqlite3.Database('./graduation.db');
 db.serialize(() => {
     db.run(`
@@ -62,7 +55,7 @@ db.serialize(() => {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT UNIQUE NOT NULL,
             fullname TEXT NOT NULL,
-            studentId TEXT NOT NULL,
+            studentId TEXT NOT NULL UNIQUE,   -- 添加唯一约束，防止重复
             phone TEXT NOT NULL,
             email TEXT,
             photoPath TEXT,
@@ -73,7 +66,6 @@ db.serialize(() => {
     `);
 });
 
-// 生成唯一核销码
 function generateRedeemCode() {
     return uuidv4().replace(/-/g, '').substring(0, 12).toUpperCase();
 }
@@ -82,33 +74,43 @@ function getSubmissionByCode(code, callback) {
     db.get('SELECT * FROM submissions WHERE code = ?', [code], callback);
 }
 
-// 首页表单
+// 首页
 app.get('/', (req, res) => {
     res.render('form', { error: null });
 });
 
-// 提交表单
+// 提交（带学号重复检查）
 app.post('/submit-form', upload.single('photo'), (req, res) => {
     const { fullname, studentId, phone, email } = req.body;
     if (!fullname || !studentId || !phone) {
         return res.render('form', { error: '请完整填写姓名、学号、手机号' });
     }
-    const photoPath = req.file ? `/uploads/${req.file.filename}` : null;
-    const code = generateRedeemCode();
 
-    db.run(`INSERT INTO submissions (code, fullname, studentId, phone, email, photoPath) 
-            VALUES (?, ?, ?, ?, ?, ?)`,
-        [code, fullname, studentId, phone, email || null, photoPath],
-        function(err) {
-            if (err) {
-                console.error(err);
-                return res.render('form', { error: '提交失败，请稍后重试' });
-            }
-            res.redirect(`/success?code=${code}`);
-        });
+    db.get('SELECT id FROM submissions WHERE studentId = ?', [studentId], (err, row) => {
+        if (err) {
+            console.error(err);
+            return res.render('form', { error: '系统错误，请稍后重试' });
+        }
+        if (row) {
+            return res.render('form', { error: '该学号已经提交过申请，每人仅限一次！' });
+        }
+
+        const photoPath = req.file ? `/uploads/${req.file.filename}` : null;
+        const code = generateRedeemCode();
+
+        db.run(`INSERT INTO submissions (code, fullname, studentId, phone, email, photoPath) 
+                VALUES (?, ?, ?, ?, ?, ?)`,
+            [code, fullname, studentId, phone, email || null, photoPath],
+            function(err) {
+                if (err) {
+                    console.error(err);
+                    return res.render('form', { error: '提交失败，请稍后重试' });
+                }
+                res.redirect(`/success?code=${code}`);
+            });
+    });
 });
 
-// 成功页 + 二维码
 app.get('/success', (req, res) => {
     const code = req.query.code;
     if (!code) return res.redirect('/');
@@ -119,8 +121,37 @@ app.get('/success', (req, res) => {
     });
 });
 
-// 核销页面（工作人员扫码访问）
-app.get('/redeem', (req, res) => {
+// 核销页面（工作人员访问）—— 需要工作人员登录吗？我们独立一个工作人员登录页面
+// 为了让核销也需要登录，我们可以新增一个 staff 登录，或者共用 admin 密码？通常给工作人员单独的简单密码。
+// 这里新增一个工作人员核销登录入口，或者直接在核销前要求输入密码。为简单且安全，我们增加一个独立的核销认证中间件。
+// 设计：访问 /redeem?code=xxx 时，先检查 session 中是否已通过 staff 认证，否则重定向到 /staff/login，登录后跳转回原页面。
+
+// 工作人员登录页面
+app.get('/staff/login', (req, res) => {
+    const redirect = req.query.redirect || '/';
+    res.render('staffLogin', { error: null, redirect });
+});
+
+app.post('/staff/login', (req, res) => {
+    const { password, redirect } = req.body;
+    const staffPwd = process.env.STAFF_PASSWORD || 'Staff2026';
+    if (password === staffPwd) {
+        req.session.isStaff = true;
+        res.redirect(redirect || '/');
+    } else {
+        res.render('staffLogin', { error: '密码错误', redirect: redirect || '/' });
+    }
+});
+
+// 核销保护中间件
+function requireStaff(req, res, next) {
+    if (req.session.isStaff) return next();
+    const redirectUrl = `/staff/login?redirect=${encodeURIComponent(req.originalUrl)}`;
+    res.redirect(redirectUrl);
+}
+
+// 核销页面（受保护）
+app.get('/redeem', requireStaff, (req, res) => {
     const code = req.query.code;
     if (!code) return res.status(400).send('缺少核销码参数');
     getSubmissionByCode(code, (err, submission) => {
@@ -130,8 +161,8 @@ app.get('/redeem', (req, res) => {
     });
 });
 
-// 执行核销 API
-app.post('/api/redeem', (req, res) => {
+// 执行核销 API（同样受保护）
+app.post('/api/redeem', requireStaff, (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ success: false, message: '缺少核销码' });
     db.get('SELECT status FROM submissions WHERE code = ?', [code], (err, row) => {
@@ -146,7 +177,7 @@ app.post('/api/redeem', (req, res) => {
     });
 });
 
-// 管理员后台
+// 管理员后台（原有）
 app.get('/admin/login', (req, res) => {
     res.render('adminLogin', { error: null });
 });
@@ -171,6 +202,30 @@ app.get('/admin/dashboard', requireAdmin, (req, res) => {
     db.all('SELECT * FROM submissions ORDER BY created_at DESC', [], (err, rows) => {
         if (err) return res.status(500).send('数据库错误');
         res.render('adminDashboard', { submissions: rows });
+    });
+});
+
+// 管理员删除记录（带照片删除）
+app.delete('/api/submission/:id', requireAdmin, (req, res) => {
+    const id = req.params.id;
+    db.get('SELECT photoPath FROM submissions WHERE id = ?', [id], (err, row) => {
+        if (err || !row) {
+            return res.status(404).json({ success: false, message: '记录不存在' });
+        }
+        const photoPath = row.photoPath;
+        db.run('DELETE FROM submissions WHERE id = ?', [id], function(err) {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({ success: false, message: '删除失败' });
+            }
+            if (photoPath) {
+                const filePath = path.join(__dirname, photoPath);
+                fs.unlink(filePath, (unlinkErr) => {
+                    if (unlinkErr) console.error('删除照片文件失败:', unlinkErr);
+                });
+            }
+            res.json({ success: true, message: '删除成功' });
+        });
     });
 });
 
