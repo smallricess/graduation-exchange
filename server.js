@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 最大提交总份数限制（从环境变量读取，默认200）
+// 最大提交总份数限制（默认200，可通过环境变量修改）
 const MAX_SUBMISSIONS = process.env.MAX_SUBMISSIONS ? parseInt(process.env.MAX_SUBMISSIONS) : 200;
 
 app.set('trust proxy', 1);
@@ -67,7 +67,6 @@ db.serialize(() => {
             redeemed_at DATETIME
         )
     `);
-    // 确保 studentId 字段有唯一索引（兼容旧表）
     db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_studentId ON submissions (studentId)`);
 });
 
@@ -84,14 +83,13 @@ app.get('/', (req, res) => {
     res.render('form', { error: null });
 });
 
-// 提交（带总数限制 + 学号重复检查）
+// 提交（总数限制 + 学号重复检查）
 app.post('/submit-form', upload.single('photo'), (req, res) => {
     const { fullname, studentId, phone, email } = req.body;
     if (!fullname || !studentId || !phone) {
         return res.render('form', { error: '请完整填写姓名、学号、手机号' });
     }
 
-    // 第一步：检查总提交数限制
     db.get('SELECT COUNT(*) as count FROM submissions', (err, row) => {
         if (err) {
             console.error(err);
@@ -100,7 +98,6 @@ app.post('/submit-form', upload.single('photo'), (req, res) => {
         if (MAX_SUBMISSIONS !== null && row.count >= MAX_SUBMISSIONS) {
             return res.render('form', { error: `活动名额已满（上限 ${MAX_SUBMISSIONS} 人），无法继续报名。` });
         }
-        // 第二步：检查学号重复
         db.get('SELECT id FROM submissions WHERE studentId = ?', [studentId], (err, row) => {
             if (err) {
                 console.error(err);
@@ -154,14 +151,12 @@ app.post('/staff/login', (req, res) => {
     }
 });
 
-// 核销保护中间件
 function requireStaff(req, res, next) {
     if (req.session.isStaff) return next();
     const redirectUrl = `/staff/login?redirect=${encodeURIComponent(req.originalUrl)}`;
     res.redirect(redirectUrl);
 }
 
-// 核销页面（受工作人员保护）
 app.get('/redeem', requireStaff, (req, res) => {
     const code = req.query.code;
     if (!code) return res.status(400).send('缺少核销码参数');
@@ -172,7 +167,6 @@ app.get('/redeem', requireStaff, (req, res) => {
     });
 });
 
-// 执行核销 API（受保护）
 app.post('/api/redeem', requireStaff, (req, res) => {
     const { code } = req.body;
     if (!code) return res.status(400).json({ success: false, message: '缺少核销码' });
@@ -219,7 +213,6 @@ app.get('/admin/dashboard', requireAdmin, (req, res) => {
     });
 });
 
-// 管理员删除记录（同时删除照片）
 app.delete('/api/submission/:id', requireAdmin, (req, res) => {
     const id = req.params.id;
     db.get('SELECT photoPath FROM submissions WHERE id = ?', [id], (err, row) => {

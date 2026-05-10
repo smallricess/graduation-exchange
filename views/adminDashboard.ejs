@@ -17,19 +17,26 @@
         .logout{float:right;background:#ef4444;padding:5px 12px;border-radius:40px;color:white;text-decoration:none;}
         .delete-btn{background:#dc2626;color:white;border:none;padding:4px 10px;border-radius:20px;cursor:pointer;}
         .delete-btn:hover{background:#b91c1c;}
+        .qr-btn{background:#3b82f6;border:none;padding:5px 15px;border-radius:20px;color:white;cursor:pointer;margin-left:15px;}
+        .qr-btn:hover{background:#2563eb;}
+        /* 模态框样式 */
+        .modal {display: none;position: fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
+        .modal-content{background:white;border-radius:28px;padding:20px;text-align:center;max-width:300px;margin:auto;}
+        .modal-content button{margin-top:10px;padding:5px 15px;border-radius:20px;border:none;color:white;cursor:pointer;}
+        .download-btn{background:#10b981;}
+        .close-btn{background:#ef4444;}
     </style>
 </head>
 <body>
 <div class="card">
-    <h2>📋 所有兑换申请记录 <a href="/admin/logout" class="logout">登出</a></h2>
+    <h2>📋 所有兑换申请记录 
+        <button id="showQRBtn" class="qr-btn">📱 生成宣传二维码</button>
+        <a href="/admin/logout" class="logout">登出</a>
+    </h2>
     <div style="overflow-x:auto;">
         <table id="data-table">
             <thead>
-                <tr>
-                    <th>ID</th><th>姓名</th><th>学号</th><th>手机</th><th>照片</th>
-                    <th>核销码</th><th>状态</th><th>提交时间</th><th>核销时间</th><th>操作</th>
-                </tr>
-            </thead>
+                <tr><th>ID</th><th>姓名</th><th>学号</th><th>手机</th><th>照片</th><th>核销码</th><th>状态</th><th>提交时间</th><th>核销时间</th><th>操作</th></tr></thead>
             <tbody>
                 <% submissions.forEach(s => { %>
                 <tr data-id="<%= s.id %>">
@@ -56,7 +63,20 @@
     </p>
 </div>
 
+<!-- 二维码模态框 -->
+<div id="qrModal" class="modal">
+    <div class="modal-content">
+        <h3>📱 扫描二维码访问活动</h3>
+        <div id="qrCodeContainer"></div>
+        <p style="margin-top:10px; word-break:break-all;">网址：<span id="siteUrl"></span></p>
+        <button id="downloadQRBtn" class="download-btn">⬇️ 下载二维码</button>
+        <button id="closeQRBtn" class="close-btn">关闭</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
 <script>
+    // 删除按钮功能
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async function() {
             const id = this.getAttribute('data-id');
@@ -71,6 +91,7 @@
                     const totalSpan = document.querySelector('p');
                     if (totalSpan) {
                         const count = document.querySelectorAll('#data-table tbody tr').length;
+                        const max = <%= max %>;
                         totalSpan.innerText = `总提交人数: ${count}${max ? ` / 上限 ${max}，剩余名额: ${max - count}` : ''}`;
                     }
                 } else {
@@ -80,6 +101,52 @@
                 alert('网络错误，请重试');
             }
         });
+    });
+
+    // 二维码相关
+    const siteUrl = window.location.origin;
+    document.getElementById('siteUrl').innerText = siteUrl;
+    let qr = null;
+    const modal = document.getElementById('qrModal');
+    const showBtn = document.getElementById('showQRBtn');
+    const closeBtn = document.getElementById('closeQRBtn');
+    const downloadBtn = document.getElementById('downloadQRBtn');
+
+    showBtn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        if (!qr) {
+            const container = document.getElementById('qrCodeContainer');
+            container.innerHTML = '';
+            qr = new QRCode(container, {
+                text: siteUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    downloadBtn.addEventListener('click', () => {
+        const canvas = document.querySelector('#qrCodeContainer canvas');
+        if (canvas) {
+            const link = document.createElement('a');
+            link.download = 'graduation_qrcode.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        } else {
+            alert('二维码尚未生成，请稍后再试');
+        }
+    });
+
+    // 点击模态背景关闭
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
     });
 </script>
 </body>
