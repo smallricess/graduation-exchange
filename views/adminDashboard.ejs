@@ -48,11 +48,15 @@
             </tbody>
         </table>
     </div>
-    <p style="margin-top:20px;">总提交人数: <%= submissions.length %></p>
+    <p>
+        总提交人数: <%= total %>
+        <% if (max !== null) { %>
+            / 上限 <%= max %>，剩余名额: <strong><%= remaining %></strong>
+        <% } %>
+    </p>
 </div>
 
 <script>
-    // 为所有删除按钮绑定事件（动态更新也可能需要，这里直接挂载）
     document.querySelectorAll('.delete-btn').forEach(btn => {
         btn.addEventListener('click', async function() {
             const id = this.getAttribute('data-id');
@@ -62,14 +66,12 @@
                 const data = await res.json();
                 if (data.success) {
                     alert('删除成功');
-                    // 移除表格中的该行
                     const row = this.closest('tr');
                     row.remove();
-                    // 更新总人数显示
                     const totalSpan = document.querySelector('p');
                     if (totalSpan) {
                         const count = document.querySelectorAll('#data-table tbody tr').length;
-                        totalSpan.innerText = `总提交人数: ${count}`;
+                        totalSpan.innerText = `总提交人数: ${count}${max ? ` / 上限 ${max}，剩余名额: ${max - count}` : ''}`;
                     }
                 } else {
                     alert('删除失败：' + (data.message || '未知错误'));
