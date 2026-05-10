@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 最大提交总份数限制（从环境变量读取，默认200）
-const MAX_SUBMISSIONS = process.env.MAX_SUBMISSIONS ? parseInt(process.env.MAX_SUBMISSIONS) : 3;
+const MAX_SUBMISSIONS = process.env.MAX_SUBMISSIONS ? parseInt(process.env.MAX_SUBMISSIONS) : 200;
 
 app.set('trust proxy', 1);
 app.use(express.static('public'));
