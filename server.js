@@ -236,6 +236,52 @@ app.delete('/api/submission/:id', requireAdmin, (req, res) => {
     });
 });
 
+// ========== 新增：管理员导出数据为 CSV ==========
+app.get('/admin/export', requireAdmin, (req, res) => {
+    db.all(`
+        SELECT id, fullname, studentId, phone, email, photoPath, code, status, created_at, redeemed_at 
+        FROM submissions 
+        ORDER BY created_at DESC
+    `, [], (err, rows) => {
+        if (err) {
+            console.error(err);
+            return res.status(500).send('导出失败');
+        }
+
+        // CSV 表头（中文）
+        const headers = ['ID', '姓名', '学号', '手机号', '邮箱', '照片路径', '核销码', '核销状态', '提交时间', '核销时间'];
+        const csvRows = [headers.join(',')];
+
+        for (const row of rows) {
+            const statusText = row.status === 'redeemed' ? '已核销' : '未核销';
+            const redeemedAt = row.redeemed_at ? new Date(row.redeemed_at).toLocaleString() : '';
+            const createdAt = new Date(row.created_at).toLocaleString();
+
+            const rowData = [
+                row.id,
+                row.fullname,
+                row.studentId,
+                row.phone,
+                row.email || '',
+                row.photoPath || '',
+                row.code,
+                statusText,
+                createdAt,
+                redeemedAt
+            ];
+            // 转义双引号和逗号，防止破坏 CSV 结构
+            const escapedRow = rowData.map(cell => `"${String(cell).replace(/"/g, '""')}"`);
+            csvRows.push(escapedRow.join(','));
+        }
+
+        const csvContent = csvRows.join('\n');
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename=graduation_submissions.csv');
+        // 添加 BOM 解决 Excel 中文乱码
+        res.send('\uFEFF' + csvContent);
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`✅ 毕业季纪念徽章系统已启动: http://localhost:${PORT}`);
     console.log(`🔢 最大提交名额限制: ${MAX_SUBMISSIONS === null ? '无限制' : MAX_SUBMISSIONS}`);

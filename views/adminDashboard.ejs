@@ -19,6 +19,8 @@
         .delete-btn:hover{background:#b91c1c;}
         .qr-btn{background:#3b82f6;border:none;padding:5px 15px;border-radius:20px;color:white;cursor:pointer;margin-left:15px;}
         .qr-btn:hover{background:#2563eb;}
+        .export-btn{background:#10b981;border:none;padding:5px 15px;border-radius:20px;color:white;text-decoration:none;margin-left:15px;display:inline-block;}
+        .export-btn:hover{background:#059669;}
         /* 模态框样式 */
         .modal {display: none;position: fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;}
         .modal-content{background:white;border-radius:28px;padding:20px;text-align:center;max-width:300px;margin:auto;}
@@ -30,6 +32,7 @@
 <body>
 <div class="card">
     <h2>📋 所有兑换申请记录 
+        <a href="/admin/export" class="export-btn">📎 导出数据</a>
         <button id="showQRBtn" class="qr-btn">📱 生成宣传二维码</button>
         <a href="/admin/logout" class="logout">登出</a>
     </h2>
@@ -144,7 +147,6 @@
         }
     });
 
-    // 点击模态背景关闭
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.style.display = 'none';
     });
