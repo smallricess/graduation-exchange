@@ -51,7 +51,11 @@ const upload = multer({
     }
 });
 
-const db = new sqlite3.Database('./graduation.db');
+// 数据库连接：优先使用环境变量 DB_PATH 指定的绝对路径，否则使用相对路径 ./graduation.db
+const dbPath = process.env.DB_PATH || './graduation.db';
+const db = new sqlite3.Database(dbPath);
+console.log(`📁 使用数据库文件: ${dbPath}`);
+
 db.serialize(() => {
     db.run(`
         CREATE TABLE IF NOT EXISTS submissions (
@@ -236,7 +240,7 @@ app.delete('/api/submission/:id', requireAdmin, (req, res) => {
     });
 });
 
-// ========== 新增：管理员导出数据为 CSV ==========
+// 管理员导出数据为 CSV
 app.get('/admin/export', requireAdmin, (req, res) => {
     db.all(`
         SELECT id, fullname, studentId, phone, email, photoPath, code, status, created_at, redeemed_at 
@@ -248,7 +252,6 @@ app.get('/admin/export', requireAdmin, (req, res) => {
             return res.status(500).send('导出失败');
         }
 
-        // CSV 表头（中文）
         const headers = ['ID', '姓名', '学号', '手机号', '邮箱', '照片路径', '核销码', '核销状态', '提交时间', '核销时间'];
         const csvRows = [headers.join(',')];
 
@@ -269,7 +272,6 @@ app.get('/admin/export', requireAdmin, (req, res) => {
                 createdAt,
                 redeemedAt
             ];
-            // 转义双引号和逗号，防止破坏 CSV 结构
             const escapedRow = rowData.map(cell => `"${String(cell).replace(/"/g, '""')}"`);
             csvRows.push(escapedRow.join(','));
         }
@@ -277,7 +279,6 @@ app.get('/admin/export', requireAdmin, (req, res) => {
         const csvContent = csvRows.join('\n');
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename=graduation_submissions.csv');
-        // 添加 BOM 解决 Excel 中文乱码
         res.send('\uFEFF' + csvContent);
     });
 });
