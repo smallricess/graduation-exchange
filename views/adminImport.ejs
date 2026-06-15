@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导入数据 - 管理员</title>
+    <style>
+        body{background:#f0f2f5;font-family:sans-serif;padding:20px;}
+        .card{background:white;border-radius:28px;padding:24px;max-width:600px;margin:0 auto;}
+        input,button{width:100%;padding:10px;margin-top:10px;border-radius:20px;border:1px solid #ccc;}
+        button{background:#3b82f6;color:white;font-weight:bold;border:none;cursor:pointer;}
+        button:hover{background:#2563eb;}
+        .error{color:red;}
+        .success{color:green;}
+        .note{font-size:0.8rem;color:#666;margin-top:15px;}
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>📂 导入学生数据</h2>
+    <p>请上传 Excel 文件 (.xlsx 或 .csv)，文件需包含列：<strong>姓名、学号、手机号</strong>（可选：邮箱、核销码、状态）。</p>
+    <% if (error) { %>
+        <div class="error"><%= error %></div>
+    <% } %>
+    <% if (success) { %>
+        <div class="success"><%= success %></div>
+    <% } %>
+    <form method="POST" action="/admin/import" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".xlsx, .csv" required>
+        <button type="submit">开始导入</button>
+    </form>
+    <div class="note">
+        <strong>提示：</strong><br>
+        - 学号重复的记录会自动跳过。<br>
+        - 如果没有核销码，系统会自动生成新的核销码。<br>
+        - 核销码列若已存在且未被使用，会保留原码。
+    </div>
+    <p style="margin-top:20px;"><a href="/admin/dashboard">← 返回后台</a></p>
+</div>
+</body>
+</html>
