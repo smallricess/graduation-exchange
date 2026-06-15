@@ -5,7 +5,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const XLSX = require('xlsx');  // 导入Excel解析库
+const XLSX = require('xlsx');   // 导入 Excel 依赖
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -241,7 +241,7 @@ app.delete('/api/submission/:id', requireAdmin, (req, res) => {
     });
 });
 
-// 管理员导出数据为 CSV
+// ========== 导出数据 ==========
 app.get('/admin/export', requireAdmin, (req, res) => {
     db.all(`
         SELECT id, fullname, studentId, phone, email, photoPath, code, status, created_at, redeemed_at 
@@ -284,16 +284,14 @@ app.get('/admin/export', requireAdmin, (req, res) => {
     });
 });
 
-// ========== 导入数据功能 ==========
+// ========== 导入数据（修复异步逻辑，支持“手机号”列） ==========
 const multerImport = multer({ storage: multer.memoryStorage() });
 
-// 导入页面
 app.get('/admin/import', requireAdmin, (req, res) => {
     res.render('adminImport', { error: null, success: null });
 });
 
-// 处理导入
-app.post('/admin/import', requireAdmin, multerImport.single('file'), (req, res) => {
+app.post('/admin/import', requireAdmin, multerImport.single('file'), async (req, res) => {
     if (!req.file) {
         return res.render('adminImport', { error: '请选择文件', success: null });
     }
@@ -308,12 +306,12 @@ app.post('/admin/import', requireAdmin, multerImport.single('file'), (req, res) 
             return res.render('adminImport', { error: '文件至少需要两行（表头+数据）', success: null });
         }
 
-        // 自动识别列索引（根据表头文字）
+        // 自动识别列索引（表头）
         const headers = rows[0];
         let nameCol = -1, studentIdCol = -1, phoneCol = -1, emailCol = -1, codeCol = -1, statusCol = -1;
         headers.forEach((h, idx) => {
             const str = String(h).toLowerCase();
-            if (str.includes('姓名') || str === 'name') nameCol = idx;
+            if (str.includes('姓名')) nameCol = idx;
             if (str.includes('学号')) studentIdCol = idx;
             if (str.includes('手机')) phoneCol = idx;
             if (str.includes('邮箱')) emailCol = idx;
@@ -327,65 +325,77 @@ app.post('/admin/import', requireAdmin, multerImport.single('file'), (req, res) 
 
         let successCount = 0;
         let skipCount = 0;
-        const errors = [];
+        let errorCount = 0;
 
-        // 使用事务批量插入（注意异步处理需谨慎）
-        db.serialize(() => {
-            db.run('BEGIN TRANSACTION');
-            const stmt = db.prepare(`
-                INSERT OR IGNORE INTO submissions (fullname, studentId, phone, email, code, status, created_at, redeemed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            `);
-
-            for (let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                const fullname = row[nameCol] ? String(row[nameCol]).trim() : '';
-                const studentId = row[studentIdCol] ? String(row[studentIdCol]).trim() : '';
-                const phone = row[phoneCol] ? String(row[phoneCol]).trim() : '';
-                const email = emailCol !== -1 && row[emailCol] ? String(row[emailCol]).trim() : '';
-                let code = codeCol !== -1 && row[codeCol] ? String(row[codeCol]).trim() : '';
-                let status = (statusCol !== -1 && row[statusCol]) ? (String(row[statusCol]).includes('已核销') ? 'redeemed' : 'unused') : 'unused';
-                let createdAt = null;
-                let redeemedAt = null;
-
-                if (!fullname || !studentId || !phone) continue;
-
-                // 检查学号是否已存在（简单方式：先查询，如果存在则跳过，但在循环中同步查询会阻塞。这里简化：使用 INSERT OR IGNORE 依赖唯一约束）
-                // 为了计数准确，先查询一下
-                db.get('SELECT id FROM submissions WHERE studentId = ?', [studentId], (err, existing) => {
-                    if (existing) {
-                        skipCount++;
-                        return;
-                    }
-
-                    // 如果没有核销码或核销码已存在，生成新码
-                    if (!code) {
-                        code = generateRedeemCode();
-                    } else {
-                        db.get('SELECT id FROM submissions WHERE code = ?', [code], (err, existingCode) => {
-                            if (existingCode) code = generateRedeemCode();
-                        });
-                    }
-
-                    stmt.run([fullname, studentId, phone, email, code, status, createdAt, redeemedAt], (err) => {
-                        if (err) errors.push(`第${i+1}行: ${err.message}`);
-                        else successCount++;
-                    });
-                });
-            }
-
-            stmt.finalize();
-            db.run('COMMIT', (err) => {
-                if (err) {
-                    db.run('ROLLBACK');
-                    return res.render('adminImport', { error: '导入失败，数据库错误', success: null });
-                }
-                res.render('adminImport', { error: null, success: `导入完成：成功 ${successCount} 条，跳过 ${skipCount} 条（学号重复），失败 ${errors.length} 条` });
+        // 开始事务
+        await new Promise((resolve, reject) => {
+            db.run('BEGIN TRANSACTION', (err) => {
+                if (err) reject(err);
+                else resolve();
             });
         });
+
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const fullname = row[nameCol] ? String(row[nameCol]).trim() : '';
+            const studentId = row[studentIdCol] ? String(row[studentIdCol]).trim() : '';
+            const phone = row[phoneCol] ? String(row[phoneCol]).trim() : '';
+            const email = emailCol !== -1 && row[emailCol] ? String(row[emailCol]).trim() : '';
+            let code = codeCol !== -1 && row[codeCol] ? String(row[codeCol]).trim() : '';
+            const statusRaw = (statusCol !== -1 && row[statusCol]) ? String(row[statusCol]) : '';
+            const status = statusRaw.includes('已核销') ? 'redeemed' : 'unused';
+
+            if (!fullname || !studentId || !phone) continue;
+
+            // 检查学号是否已存在
+            const existing = await new Promise((resolve) => {
+                db.get('SELECT id FROM submissions WHERE studentId = ?', [studentId], (err, row) => resolve(row));
+            });
+            if (existing) {
+                skipCount++;
+                continue;
+            }
+
+            // 核销码唯一性检查
+            if (code) {
+                const codeExists = await new Promise((resolve) => {
+                    db.get('SELECT id FROM submissions WHERE code = ?', [code], (err, row) => resolve(row));
+                });
+                if (codeExists) code = generateRedeemCode();
+            } else {
+                code = generateRedeemCode();
+            }
+
+            // 插入数据
+            try {
+                await new Promise((resolve, reject) => {
+                    db.run(`INSERT INTO submissions (fullname, studentId, phone, email, code, status) 
+                            VALUES (?, ?, ?, ?, ?, ?)`,
+                        [fullname, studentId, phone, email, code, status],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve();
+                        });
+                });
+                successCount++;
+            } catch (err) {
+                console.error(`插入第 ${i+1} 行失败:`, err.message);
+                errorCount++;
+            }
+        }
+
+        await new Promise((resolve, reject) => {
+            db.run('COMMIT', (err) => {
+                if (err) reject(err);
+                else resolve();
+            });
+        });
+
+        res.render('adminImport', { error: null, success: `导入完成：成功 ${successCount} 条，跳过 ${skipCount} 条（学号重复），失败 ${errorCount} 条` });
     } catch (err) {
+        await new Promise((resolve) => { db.run('ROLLBACK', resolve); });
         console.error(err);
-        res.render('adminImport', { error: '解析文件失败：' + err.message, success: null });
+        res.render('adminImport', { error: '导入失败：' + err.message, success: null });
     }
 });
 
